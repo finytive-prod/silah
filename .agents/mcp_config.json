@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "rea": {
+      "command": "/Users/mac/.nvm/versions/node/v24.14.0/bin/rea",
+      "args": [
+        "--mcp"
+      ]
+    }
+  }
+}

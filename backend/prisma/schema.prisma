@@ -1,0 +1,349 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = "postgresql://postgres.eojasudtbpgwwtivcvbs:Tickora%401234@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+  directUrl = "postgresql://postgres.eojasudtbpgwwtivcvbs:Tickora%401234@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres"
+}
+
+model User {
+  id                String             @id @default(uuid()) @db.Uuid
+  phone             String             @unique @db.VarChar(20)
+  name              String             @db.VarChar(100)
+  avatarUrl         String?            @map("avatar_url") @db.VarChar(500)
+  language          Language           @default(en)
+  isSuperAdmin      Boolean            @default(false) @map("is_super_admin")
+  isOnboarded       Boolean            @default(false) @map("is_onboarded")
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  address           String?
+  age               Int?
+  announcements     Announcement[]     @relation("AnnouncementCreator")
+  devices           Device[]
+  masjidAdmins      MasjidAdmin[]
+  createdMasjids    Masjid[]           @relation("MasjidCreator")
+  memberships       Membership[]
+  notificationPrefs NotificationPref[]
+  prayerTimes       PrayerTime[]       @relation("PrayerTimeUpdater")
+  recordedPayments  SandhaPayment[]    @relation("PaymentRecorder")
+  sandhaPayments    SandhaPayment[]    @relation("UserPayments")
+  sandhaPlanMembers SandhaPlanMember[] @relation("LinkedUserPlanMembers")
+  sandhaPlans       SandhaPlan[]       @relation("SandhaPlanCreator")
+  specialSchedules  SpecialSchedule[]  @relation("ScheduleCreator")
+
+  @@index([phone], map: "idx_users_phone")
+  @@map("users")
+}
+
+model Masjid {
+  id                String             @id @default(uuid()) @db.Uuid
+  name              String             @db.VarChar(200)
+  nameTa            String?            @map("name_ta") @db.VarChar(200)
+  address           String
+  latitude          Decimal?           @db.Decimal(10, 8)
+  longitude         Decimal?           @db.Decimal(11, 8)
+  city              String             @db.VarChar(100)
+  state             String?            @db.VarChar(100)
+  country           String             @default("India") @db.VarChar(100)
+  phone             String?            @db.VarChar(20)
+  photoUrl          String?            @map("photo_url") @db.VarChar(500)
+  qrToken           String             @unique @map("qr_token") @db.VarChar(64)
+  qrTokenExpiresAt  DateTime?          @map("qr_token_expires_at") @db.Timestamptz(6)
+  approvalStatus    MasjidApprovalStatus @default(PENDING) @map("approval_status")
+  rejectionReason   String?            @map("rejection_reason")
+  isActive          Boolean            @default(true) @map("is_active")
+  createdBy         String             @map("created_by") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  announcements     Announcement[]
+  admins            MasjidAdmin[]
+  creator           User               @relation("MasjidCreator", fields: [createdBy], references: [id])
+  memberships       Membership[]
+  notificationPrefs NotificationPref[]
+  prayerTimes       PrayerTime[]
+  sandhaPlans       SandhaPlan[]
+  specialSchedules  SpecialSchedule[]
+
+  @@index([city], map: "idx_masjids_city")
+  @@index([qrToken], map: "idx_masjids_qr_token")
+  @@map("masjids")
+}
+
+model Role {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         RoleType      @unique
+  description  String?
+  masjidAdmins MasjidAdmin[]
+
+  @@map("roles")
+}
+
+model MasjidAdmin {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  masjidId  String   @map("masjid_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  masjid    Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, masjidId, roleId], name: "idx_masjid_admins_unique")
+  @@index([masjidId], map: "idx_masjid_admins_masjid")
+  @@map("masjid_admins")
+}
+
+model Membership {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  masjidId  String   @map("masjid_id") @db.Uuid
+  isPrimary Boolean  @default(false) @map("is_primary")
+  joinedAt  DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+  masjid    Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, masjidId], name: "idx_memberships_unique")
+  @@index([masjidId], map: "idx_memberships_masjid")
+  @@map("memberships")
+}
+
+model PrayerTime {
+  id            String   @id @default(uuid()) @db.Uuid
+  masjidId      String   @map("masjid_id") @db.Uuid
+  date          DateTime @db.Date
+  fajrAdhan     String?  @map("fajr_adhan") @db.VarChar(8)
+  fajrJamaah    String   @map("fajr_jamaah") @db.VarChar(8)
+  dhuhrAdhan    String?  @map("dhuhr_adhan") @db.VarChar(8)
+  dhuhrJamaah   String   @map("dhuhr_jamaah") @db.VarChar(8)
+  asrAdhan      String?  @map("asr_adhan") @db.VarChar(8)
+  asrJamaah     String   @map("asr_jamaah") @db.VarChar(8)
+  maghribAdhan  String?  @map("maghrib_adhan") @db.VarChar(8)
+  maghribJamaah String   @map("maghrib_jamaah") @db.VarChar(8)
+  ishaAdhan     String?  @map("isha_adhan") @db.VarChar(8)
+  ishaJamaah    String   @map("isha_jamaah") @db.VarChar(8)
+  jummahKhutbah String?  @map("jummah_khutbah") @db.VarChar(8)
+  jummahJamaah  String?  @map("jummah_jamaah") @db.VarChar(8)
+  updatedBy     String   @map("updated_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  masjid        Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  updater       User     @relation("PrayerTimeUpdater", fields: [updatedBy], references: [id])
+
+  @@unique([masjidId, date], name: "idx_prayer_times_unique")
+  @@map("prayer_times")
+}
+
+model SpecialSchedule {
+  id        String       @id @default(uuid()) @db.Uuid
+  masjidId  String       @map("masjid_id") @db.Uuid
+  type      ScheduleType
+  title     String       @db.VarChar(200)
+  titleTa   String?      @map("title_ta") @db.VarChar(200)
+  startDate DateTime     @map("start_date") @db.Date
+  endDate   DateTime?    @map("end_date") @db.Date
+  startTime String       @map("start_time") @db.VarChar(8)
+  endTime   String?      @map("end_time") @db.VarChar(8)
+  notes     String?
+  notesTa   String?      @map("notes_ta")
+  createdBy String       @map("created_by") @db.Uuid
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  creator   User         @relation("ScheduleCreator", fields: [createdBy], references: [id])
+  masjid    Masjid       @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@index([masjidId, startDate, endDate], map: "idx_special_schedules_dates")
+  @@map("special_schedules")
+}
+
+model Announcement {
+  id          String               @id @default(uuid()) @db.Uuid
+  masjidId    String               @map("masjid_id") @db.Uuid
+  createdBy   String               @map("created_by") @db.Uuid
+  category    AnnouncementCategory
+  title       String               @db.VarChar(300)
+  titleTa     String?              @map("title_ta") @db.VarChar(300)
+  body        String
+  bodyTa      String?              @map("body_ta")
+  isPinned    Boolean              @default(false) @map("is_pinned")
+  notifyPush  Boolean              @default(true) @map("notify_push")
+  publishedAt DateTime?            @map("published_at") @db.Timestamptz(6)
+  expiresAt   DateTime?            @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  creator     User                 @relation("AnnouncementCreator", fields: [createdBy], references: [id])
+  masjid      Masjid               @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@index([masjidId, publishedAt], map: "idx_announcements_published")
+  @@map("announcements")
+}
+
+model SandhaPlan {
+  id          String             @id @default(uuid()) @db.Uuid
+  masjidId    String             @map("masjid_id") @db.Uuid
+  name        String             @db.VarChar(200)
+  amount      Decimal            @db.Decimal(10, 2)
+  frequency   SandhaFrequency
+  description String?
+  isActive    Boolean            @default(true) @map("is_active")
+  createdBy   String             @map("created_by") @db.Uuid
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  payments    SandhaPayment[]
+  members     SandhaPlanMember[]
+  creator     User               @relation("SandhaPlanCreator", fields: [createdBy], references: [id])
+  masjid      Masjid             @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@index([masjidId], map: "idx_sandha_plans_masjid")
+  @@map("sandha_plans")
+}
+
+model SandhaPlanMember {
+  id         String          @id @default(uuid()) @db.Uuid
+  planId     String          @map("plan_id") @db.Uuid
+  userId     String?         @map("user_id") @db.Uuid
+  phone      String          @db.VarChar(20)
+  name       String          @db.VarChar(100)
+  autoLinked Boolean         @default(false) @map("auto_linked")
+  linkedAt   DateTime?       @map("linked_at") @db.Timestamptz(6)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  payments   SandhaPayment[]
+  plan       SandhaPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user       User?           @relation("LinkedUserPlanMembers", fields: [userId], references: [id])
+
+  @@unique([planId, phone], name: "idx_sandha_plan_members_unique")
+  @@index([phone], map: "idx_sandha_plan_members_phone")
+  @@map("sandha_plan_members")
+}
+
+model SandhaPayment {
+  id            String           @id @default(uuid()) @db.Uuid
+  planId        String           @map("plan_id") @db.Uuid
+  userId        String?          @map("user_id") @db.Uuid
+  planMemberId  String           @map("plan_member_id") @db.Uuid
+  amount        Decimal          @db.Decimal(10, 2)
+  status        PaymentStatus    @default(PAID)
+  method        PaymentMethod    @default(CASH)
+  receiptNumber String?          @map("receipt_number") @db.VarChar(50)
+  periodStart   DateTime         @map("period_start") @db.Date
+  periodEnd     DateTime         @map("period_end") @db.Date
+  notes         String?
+  recordedBy    String           @map("recorded_by") @db.Uuid
+  paidAt        DateTime         @map("paid_at") @db.Timestamptz(6)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  plan          SandhaPlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planMember    SandhaPlanMember @relation(fields: [planMemberId], references: [id], onDelete: Cascade)
+  recorder      User             @relation("PaymentRecorder", fields: [recordedBy], references: [id])
+  user          User?            @relation("UserPayments", fields: [userId], references: [id])
+
+  @@index([planMemberId, periodStart], map: "idx_sandha_payments_member_period")
+  @@map("sandha_payments")
+}
+
+model NotificationPref {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  masjidId         String   @map("masjid_id") @db.Uuid
+  allAnnouncements Boolean  @default(true) @map("all_announcements")
+  prayerChanges    Boolean  @default(true) @map("prayer_changes")
+  emergencyAlerts  Boolean  @default(true) @map("emergency_alerts")
+  sandhaReminders  Boolean  @default(true) @map("sandha_reminders")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  masjid           Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, masjidId], name: "idx_notification_prefs_unique")
+  @@map("notification_prefs")
+}
+
+model Device {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  fcmToken     String   @unique @map("fcm_token") @db.VarChar(500)
+  platform     Platform
+  isActive     Boolean  @default(true) @map("is_active")
+  lastActiveAt DateTime @default(now()) @map("last_active_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_devices_user")
+  @@map("devices")
+}
+
+model OtpVerification {
+  id        String   @id @default(uuid()) @db.Uuid
+  phone     String   @db.VarChar(20)
+  otp       String   @db.VarChar(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  isUsed    Boolean  @default(false) @map("is_used")
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([phone, isUsed], map: "idx_otp_phone_used")
+  @@map("otp_verifications")
+}
+
+enum Language {
+  en
+  ta
+}
+
+enum MasjidApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RoleType {
+  SUPER_ADMIN
+  ADMIN
+  FINANCE
+  ANNOUNCEMENT
+}
+
+enum ScheduleType {
+  RAMZAN_TIMETABLE
+  TARAWEEH
+  TAHAJJUD
+  EID_UL_FITR
+  EID_UL_ADHA
+  JUMMAH_SPECIAL
+  MILAD
+  OTHER
+}
+
+enum AnnouncementCategory {
+  GENERAL
+  PRAYER_CHANGE
+  EVENT
+  EMERGENCY
+}
+
+enum SandhaFrequency {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  PENDING
+  WAIVED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  OTHER
+}
+
+enum Platform {
+  ANDROID
+  IOS
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "264192911141",
+    "project_id": "silah-2036a",
+    "storage_bucket": "silah-2036a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:264192911141:android:6d283042173f46cf15dccc",
+        "android_client_info": {
+          "package_name": "com.finytive.silah"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD68JT73JQ8S9Zg7PZpwqlr7Cx3NxkPv64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
